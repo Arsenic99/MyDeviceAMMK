@@ -1,0 +1,21 @@
+FROM node:22-alpine
+
+RUN apk add --no-cache libc6-compat bash git
+
+ARG NODE_ENV=development
+ENV NODE_ENV=${NODE_ENV}
+
+WORKDIR /opt/app
+
+COPY package.json package-lock.json ./
+
+RUN npm install --include=optional 
+
+COPY . .
+
+RUN chown -R node:node /opt/app
+USER node
+
+EXPOSE 3000
+
+CMD ["npm", "run", "dev"]
