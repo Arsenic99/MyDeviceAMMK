@@ -6,7 +6,8 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ../frontend:/opt/app
+      - ../frontend:/app
+      - /app/node_modules
     environment:
       NODE_ENV: ${NODE_ENV}
     networks:
@@ -16,6 +17,7 @@ services:
     build: 
       context: ../backend
       dockerfile: ../dev-config/Dockerfile.backend
+    user: "0:0"
     env_file: .env
     environment:
       DATABASE_CLIENT: ${DATABASE_CLIENT}
@@ -35,7 +37,8 @@ services:
     depends_on:
       - strapiDB
     volumes:
-      - ../backend:/usr/app
+      - ../backend:/opt/app
+      - /opt/app/node_modules
 
   strapiDB:
     container_name: strapiDB
