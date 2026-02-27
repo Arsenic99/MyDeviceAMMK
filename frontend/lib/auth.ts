@@ -4,6 +4,10 @@ export type AuthResponse = {
     id: number;
     username: string;
     email: string;
+    firstName?: string;
+    lastName?: string;
+    position?: string;
+    department?: string;
   };
 };
 

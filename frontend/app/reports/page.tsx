@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react";
 import AppNavbar from "@/components/app-navbar";
 import { getApiUrl } from "@/lib/auth";
+import {
+  formatDateAlmaty,
+  formatDateKey,
+  formatDateTimeAlmaty,
+  shiftDateKey,
+  toDateKeyAlmaty,
+} from "@/lib/datetime";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -18,7 +25,6 @@ type ReportRow = {
   movementDate: string;
   note: string;
 };
-const ALMATY_TIME_ZONE = "Asia/Almaty";
 
 function getItems(payload: unknown): UnknownRecord[] {
   if (!payload) return [];
@@ -72,56 +78,6 @@ function escapeHtml(value: string) {
     .replaceAll("'", "&#39;");
 }
 
-function getDatePartsInAlmaty(value: string) {
-  if (!value) return null;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return null;
-  const formatter = new Intl.DateTimeFormat("en-GB", {
-    timeZone: ALMATY_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-  const parts = formatter.formatToParts(parsed);
-  const read = (type: string) => parts.find((p) => p.type === type)?.value || "";
-  return {
-    year: read("year"),
-    month: read("month"),
-    day: read("day"),
-    hour: read("hour"),
-    minute: read("minute"),
-  };
-}
-
-function toAlmatyDateKey(value: string) {
-  const parts = getDatePartsInAlmaty(value);
-  if (!parts) return "";
-  return `${parts.year}-${parts.month}-${parts.day}`;
-}
-
-function shiftDateKey(dateKey: string, days: number) {
-  const [year, month, day] = dateKey.split("-").map(Number);
-  if (!year || !month || !day) return dateKey;
-  const utc = new Date(Date.UTC(year, month - 1, day));
-  utc.setUTCDate(utc.getUTCDate() + days);
-  return utc.toISOString().slice(0, 10);
-}
-
-function formatDateRu(value: string) {
-  const parts = getDatePartsInAlmaty(value);
-  if (!parts) return "—";
-  return `${parts.day}.${parts.month}.${parts.year}`;
-}
-
-function formatDateTimeRu(value: string) {
-  const parts = getDatePartsInAlmaty(value);
-  if (!parts) return "—";
-  return `${parts.day}.${parts.month}.${parts.year} ${parts.hour}:${parts.minute}`;
-}
-
 export default function ReportsPage() {
   const PAGE_SIZE = 20;
   const [rows, setRows] = useState<ReportRow[]>([]);
@@ -135,7 +91,7 @@ export default function ReportsPage() {
   const [currentPage, setCurrentPage] = useState(1);
 
   function toInputDate(value: Date) {
-    return toAlmatyDateKey(value.toISOString());
+    return toDateKeyAlmaty(value);
   }
 
   function applyPreset(days: number) {
@@ -242,7 +198,7 @@ export default function ReportsPage() {
 
     if (!dateFrom && !dateTo) return true;
     if (!row.movementDate) return false;
-    const rowDateKey = toAlmatyDateKey(row.movementDate);
+    const rowDateKey = toDateKeyAlmaty(row.movementDate);
     if (!rowDateKey) return false;
     if (dateFrom && rowDateKey < dateFrom) return false;
     if (dateTo && rowDateKey > dateTo) return false;
@@ -270,7 +226,7 @@ export default function ReportsPage() {
     const filtersSummary = [
       selectedTypes.length > 0 ? `Типы: ${selectedTypes.join(", ")}` : "Типы: все",
       dateFrom || dateTo
-        ? `Период: ${formatDateRu(dateFrom) || "—"} по ${formatDateRu(dateTo) || "—"}`
+        ? `Период: ${formatDateKey(dateFrom)} по ${formatDateKey(dateTo)}`
         : "Период: все даты",
     ];
 
@@ -284,7 +240,7 @@ export default function ReportsPage() {
             <td>${escapeHtml(row.quantity || "—")}</td>
             <td>${escapeHtml(row.fromUser || "—")}</td>
             <td>${escapeHtml(row.toUser || "—")}</td>
-            <td>${escapeHtml(formatDateRu(row.movementDate || ""))}</td>
+            <td>${escapeHtml(formatDateAlmaty(row.movementDate || ""))}</td>
             <td>${escapeHtml(row.note || "—")}</td>
           </tr>
         `
@@ -307,7 +263,7 @@ export default function ReportsPage() {
         </head>
         <body>
           <h1>Акт / Журнал операций</h1>
-          <p>Дата формирования: ${formatDateTimeRu(generatedAt.toISOString())}</p>
+          <p>Дата формирования: ${formatDateTimeAlmaty(generatedAt)}</p>
           ${filtersSummary.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}
           <p>Всего записей: ${filteredRows.length}</p>
           <table>
@@ -500,7 +456,7 @@ export default function ReportsPage() {
                         <td className="px-4 py-3 text-zinc-700">{row.fromUser || "—"}</td>
                         <td className="px-4 py-3 text-zinc-700">{row.toUser || "—"}</td>
                         <td className="px-4 py-3 text-zinc-700">{row.performedBy || "—"}</td>
-                        <td className="px-4 py-3 text-zinc-700">{formatDateTimeRu(row.movementDate || "")}</td>
+                        <td className="px-4 py-3 text-zinc-700">{formatDateTimeAlmaty(row.movementDate || "")}</td>
                         <td className="px-4 py-3 text-zinc-700">{row.note || "—"}</td>
                       </tr>
                     ))}

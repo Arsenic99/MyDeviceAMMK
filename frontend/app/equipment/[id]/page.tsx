@@ -2,15 +2,24 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { type ChangeEvent, useEffect, useState } from "react";
 import AppNavbar from "@/components/app-navbar";
 import { getApiUrl } from "@/lib/auth";
+import { formatDateTimeAlmaty } from "@/lib/datetime";
 
 type UnknownRecord = Record<string, unknown>;
 
 type UserOption = {
   id: string;
   label: string;
+};
+
+type DocumentRow = {
+  id: string;
+  name: string;
+  url: string;
+  size: string;
+  updatedAt: string;
 };
 
 type EquipmentDetails = {
@@ -28,6 +37,7 @@ type EquipmentDetails = {
   ownerEmail: string;
   createdAt: string;
   updatedAt: string;
+  documents: DocumentRow[];
   movements: {
     id: string;
     operationType: string;
@@ -38,7 +48,6 @@ type EquipmentDetails = {
     note: string;
   }[];
 };
-const ALMATY_TIME_ZONE = "Asia/Almaty";
 
 function unwrapOne(value: unknown): UnknownRecord | null {
   if (!value || typeof value !== "object") return null;
@@ -83,19 +92,17 @@ function getItems(payload: unknown): UnknownRecord[] {
   return [];
 }
 
-function formatDateTimeAlmaty(value: string) {
-  if (!value) return "—";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return new Intl.DateTimeFormat("ru-RU", {
-    timeZone: ALMATY_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(parsed);
+function toFileUrl(url: string) {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  return `${getApiUrl()}${url}`;
+}
+
+function toFileSizeLabel(value: string) {
+  const sizeMb = Number(value);
+  if (!Number.isFinite(sizeMb) || sizeMb <= 0) return "—";
+  if (sizeMb >= 10) return `${sizeMb.toFixed(1)} MB`;
+  return `${sizeMb.toFixed(2)} MB`;
 }
 
 export default function EquipmentDetailsPage() {
@@ -121,6 +128,10 @@ export default function EquipmentDetailsPage() {
   const [arrivalQuantity, setArrivalQuantity] = useState("");
   const [arrivalSaving, setArrivalSaving] = useState(false);
   const [arrivalError, setArrivalError] = useState("");
+  const [documentUploadError, setDocumentUploadError] = useState("");
+  const [documentUploading, setDocumentUploading] = useState(false);
+  const [documentDeletingId, setDocumentDeletingId] = useState("");
+  const [documentInputKey, setDocumentInputKey] = useState(0);
   const [currentUserId, setCurrentUserId] = useState("");
 
   useEffect(() => {
@@ -192,7 +203,37 @@ export default function EquipmentDetailsPage() {
 
         const equipmentId = getText(equipment, "id");
         const equipmentDocumentId = getText(equipment, "documentId");
+        let documents: DocumentRow[] = [];
         let movements: EquipmentDetails["movements"] = [];
+
+        const equipmentLookupId = equipmentDocumentId || equipmentId;
+        if (equipmentLookupId) {
+          const documentsResponse = await fetch(
+            `${getApiUrl()}/api/equipments/${equipmentLookupId}?populate[0]=documents`,
+            { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+          );
+
+          if (documentsResponse.ok) {
+            const documentsPayload = (await documentsResponse.json()) as
+              | { data?: UnknownRecord }
+              | UnknownRecord;
+            const equipmentWithDocs = unwrapOne(
+              "data" in (documentsPayload as UnknownRecord)
+                ? (documentsPayload as { data?: UnknownRecord }).data
+                : documentsPayload
+            );
+            documents = getItems(getObject(equipmentWithDocs, "documents")).map((file) => {
+              const fileUrl = getText(file, "url");
+              return {
+                id: getText(file, "id") || getText(file, "documentId") || fileUrl,
+                name: getText(file, "name") || "Файл",
+                url: toFileUrl(fileUrl),
+                size: toFileSizeLabel(getText(file, "size")),
+                updatedAt: getText(file, "updatedAt") || getText(file, "createdAt"),
+              };
+            });
+          }
+        }
 
         if (equipmentDocumentId || equipmentId) {
           const movementParams = new URLSearchParams();
@@ -261,6 +302,7 @@ export default function EquipmentDetailsPage() {
           ownerEmail: getText(owner, "email"),
           createdAt: getText(inventory, "createdAt"),
           updatedAt: getText(inventory, "updatedAt"),
+          documents,
           movements,
         });
       } catch (loadError) {
@@ -459,6 +501,131 @@ export default function EquipmentDetailsPage() {
     }
   }
 
+  async function uploadDocument(event: ChangeEvent<HTMLInputElement>) {
+    if (!data) return;
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setDocumentUploading(true);
+    setDocumentUploadError("");
+
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("Сессия не найдена");
+      }
+
+      const uploadOnce = async (refId: string) => {
+        const formData = new FormData();
+        formData.append("files", file);
+        formData.append("ref", "api::equipment.equipment");
+        formData.append("refId", refId);
+        formData.append("field", "documents");
+
+        return fetch(`${getApiUrl()}/api/upload`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        });
+      };
+
+      let response = await uploadOnce(data.equipmentDocumentId || data.equipmentId);
+      if (!response.ok && data.equipmentDocumentId && data.equipmentId) {
+        response = await uploadOnce(data.equipmentId);
+      }
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Не удалось загрузить документ");
+      }
+
+      const payload = (await response.json()) as unknown;
+      const uploadedRows = (Array.isArray(payload) ? payload : []).map((fileRow) => {
+        const entry = fileRow as UnknownRecord;
+        const fileUrl = getText(entry, "url");
+        return {
+          id: getText(entry, "id") || getText(entry, "documentId") || fileUrl,
+          name: getText(entry, "name") || "Файл",
+          url: toFileUrl(fileUrl),
+          size: toFileSizeLabel(getText(entry, "size")),
+          updatedAt: getText(entry, "updatedAt") || getText(entry, "createdAt"),
+        };
+      });
+
+      if (uploadedRows.length > 0) {
+        setData((prev) => {
+          if (!prev) return prev;
+          const next = [...uploadedRows, ...prev.documents];
+          const seen = new Set<string>();
+          return {
+            ...prev,
+            documents: next.filter((row) => {
+              if (!row.id || seen.has(row.id)) return false;
+              seen.add(row.id);
+              return true;
+            }),
+          };
+        });
+      }
+    } catch (uploadError) {
+      setDocumentUploadError(
+        uploadError instanceof Error ? uploadError.message : "Ошибка загрузки документа"
+      );
+    } finally {
+      setDocumentUploading(false);
+      setDocumentInputKey((prev) => prev + 1);
+    }
+  }
+
+  async function deleteDocument(documentId: string) {
+    const numericId = Number(documentId);
+    if (!Number.isFinite(numericId) || numericId <= 0) {
+      setDocumentUploadError("Не удалось удалить документ: некорректный id файла");
+      return;
+    }
+
+    const confirmed = window.confirm("Удалить документ? Это действие нельзя отменить.");
+    if (!confirmed) return;
+
+    setDocumentDeletingId(documentId);
+    setDocumentUploadError("");
+
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("Сессия не найдена");
+      }
+
+      const response = await fetch(`${getApiUrl()}/api/upload/files/${numericId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Не удалось удалить документ");
+      }
+
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          documents: prev.documents.filter((row) => row.id !== documentId),
+        };
+      });
+    } catch (deleteError) {
+      setDocumentUploadError(
+        deleteError instanceof Error ? deleteError.message : "Ошибка удаления документа"
+      );
+    } finally {
+      setDocumentDeletingId("");
+    }
+  }
+
   return (
     <main className="min-h-screen bg-zinc-50">
       <AppNavbar />
@@ -548,6 +715,80 @@ export default function EquipmentDetailsPage() {
                 <h3 className="text-lg font-semibold">Описание</h3>
                 <p className="mt-2 text-sm text-zinc-700">{data.description || "—"}</p>
               </div>
+
+              {data.category === "Оборудование" ? (
+                <div className="rounded-xl border p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h3 className="text-lg font-semibold">Документы</h3>
+                    <label className="cursor-pointer rounded-md border px-3 py-2 text-sm hover:bg-zinc-100">
+                      <input
+                        key={documentInputKey}
+                        type="file"
+                        className="hidden"
+                        onChange={uploadDocument}
+                        disabled={documentUploading}
+                      />
+                      {documentUploading ? "Загрузка..." : "Добавить документ"}
+                    </label>
+                  </div>
+                  {documentUploadError ? (
+                    <p className="mt-2 text-sm text-red-600">{documentUploadError}</p>
+                  ) : null}
+                  <div className="mt-3 overflow-x-auto">
+                    <table className="min-w-full border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b text-left">
+                          <th className="px-2 py-2">Название файла</th>
+                          <th className="px-2 py-2">Размер</th>
+                          <th className="px-2 py-2">Обновлено</th>
+                          <th className="px-2 py-2">Действие</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.documents.map((document) => (
+                          <tr key={document.id} className="border-b">
+                            <td className="px-2 py-2">{document.name}</td>
+                            <td className="px-2 py-2">{document.size}</td>
+                            <td className="px-2 py-2">{formatDateTimeAlmaty(document.updatedAt)}</td>
+                            <td className="px-2 py-2">
+                              <div className="flex flex-wrap gap-2">
+                                {document.url ? (
+                                  <a
+                                    href={document.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="rounded-md border px-2 py-1 text-sm hover:bg-zinc-100"
+                                    download
+                                  >
+                                    Скачать
+                                  </a>
+                                ) : (
+                                  <span>—</span>
+                                )}
+                                <button
+                                  type="button"
+                                  className="rounded-md border border-red-200 px-2 py-1 text-sm text-red-700 hover:bg-red-50 disabled:opacity-60"
+                                  onClick={() => deleteDocument(document.id)}
+                                  disabled={documentDeletingId === document.id}
+                                >
+                                  {documentDeletingId === document.id ? "Удаление..." : "Удалить"}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                        {data.documents.length === 0 ? (
+                          <tr>
+                            <td className="px-2 py-2 text-zinc-500" colSpan={4}>
+                              Документы не добавлены
+                            </td>
+                          </tr>
+                        ) : null}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="rounded-xl border p-4">
                 <h3 className="text-lg font-semibold">История движений</h3>

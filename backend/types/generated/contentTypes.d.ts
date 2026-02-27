@@ -443,7 +443,11 @@ export interface ApiEquipmentEquipment extends Struct.CollectionTypeSchema {
   attributes: {
     article: Schema.Attribute.String & Schema.Attribute.Unique;
     category: Schema.Attribute.Enumeration<
-      ['\u041E\u0421', '\u0422\u041C\u0426']
+      [
+        '\u041E\u0421',
+        '\u0422\u041C\u0426',
+        '\u041E\u0431\u043E\u0440\u0443\u0434\u043E\u0432\u0430\u043D\u0438\u0435',
+      ]
     > &
       Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<'\u0422\u041C\u0426'>;
@@ -451,6 +455,7 @@ export interface ApiEquipmentEquipment extends Struct.CollectionTypeSchema {
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     description: Schema.Attribute.String;
+    documents: Schema.Attribute.Media<'files', true>;
     inventories: Schema.Attribute.Relation<
       'oneToMany',
       'api::inventory.inventory'
@@ -1118,11 +1123,13 @@ export interface PluginUsersPermissionsUser
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    department: Schema.Attribute.String;
     email: Schema.Attribute.Email &
       Schema.Attribute.Required &
       Schema.Attribute.SetMinMaxLength<{
         minLength: 6;
       }>;
+    firstName: Schema.Attribute.String;
     inventories: Schema.Attribute.Relation<
       'oneToMany',
       'api::inventory.inventory'
@@ -1130,6 +1137,7 @@ export interface PluginUsersPermissionsUser
     isManager: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     isResponsiblePerson: Schema.Attribute.Boolean &
       Schema.Attribute.DefaultTo<false>;
+    lastName: Schema.Attribute.String;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -1157,6 +1165,7 @@ export interface PluginUsersPermissionsUser
       Schema.Attribute.SetMinMaxLength<{
         minLength: 6;
       }>;
+    position: Schema.Attribute.String;
     provider: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
     resetPasswordToken: Schema.Attribute.String & Schema.Attribute.Private;

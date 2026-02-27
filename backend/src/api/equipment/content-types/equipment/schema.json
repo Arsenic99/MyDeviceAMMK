@@ -55,7 +55,15 @@
       "default": "ТМЦ",
       "enum": [
         "ОС",
-        "ТМЦ"
+        "ТМЦ",
+        "Оборудование"
+      ]
+    },
+    "documents": {
+      "type": "media",
+      "multiple": true,
+      "allowedTypes": [
+        "files"
       ]
     }
   }

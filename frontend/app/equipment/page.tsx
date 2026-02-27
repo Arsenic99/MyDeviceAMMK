@@ -13,7 +13,6 @@ type EquipmentRow = {
   unit: string;
   category: string;
   username: string;
-  userId: string;
 };
 
 type UnknownRecord = Record<string, unknown>;
@@ -96,7 +95,6 @@ export default function EquipmentPage() {
             category: getTextField(equipment, "category") || "—",
             username:
               getTextField(user, "username") || getTextField(user, "email") || "—",
-            userId: getTextField(user, "id"),
           };
         });
 

@@ -37,63 +37,124 @@ async function getUserById(strapi: any, id: number) {
   return strapi.db.query(USER_UID).findOne({ where: { id } });
 }
 
+function withTrx<T extends Record<string, unknown>>(params: T, trx?: any): T {
+  if (!trx) return params;
+  return { ...params, transacting: trx };
+}
+
 export default factories.createCoreController(
   MOVEMENT_UID,
   ({ strapi }) => {
+    const getInventoryRows = async (
+      equipmentId: number,
+      userId: number,
+      trx?: any
+    ) =>
+      strapi.db.query(INVENTORY_UID).findMany(
+        withTrx(
+          {
+            where: {
+              equipment: equipmentId,
+              users_permissions_user: userId,
+            },
+            orderBy: { id: 'asc' },
+          },
+          trx
+        )
+      );
+
+    const setQuantity = async ({
+      equipmentId,
+      userId,
+      nextQuantity,
+      trx,
+    }: {
+      equipmentId: number;
+      userId: number;
+      nextQuantity: number;
+      trx?: any;
+    }) => {
+      const rows = await getInventoryRows(equipmentId, userId, trx);
+      const primary = rows[0];
+
+      if (primary) {
+        await strapi.db.query(INVENTORY_UID).update(
+          withTrx(
+            {
+              where: { id: primary.id },
+              data: { quantity: nextQuantity },
+            },
+            trx
+          )
+        );
+
+        if (rows.length > 1) {
+          await Promise.all(
+            rows.slice(1).map((row) =>
+              strapi.db.query(INVENTORY_UID).delete(
+                withTrx(
+                  {
+                    where: { id: row.id },
+                  },
+                  trx
+                )
+              )
+            )
+          );
+        }
+
+        return;
+      }
+
+      await strapi.db.query(INVENTORY_UID).create(
+        withTrx(
+          {
+            data: {
+              equipment: equipmentId,
+              users_permissions_user: userId,
+              quantity: nextQuantity,
+            },
+          },
+          trx
+        )
+      );
+    };
+
     const applyStockChange = async ({
       equipmentId,
       operationType,
       quantity,
       fromUserId,
       toUserId,
+      trx,
     }: {
       equipmentId: number;
       operationType: string;
       quantity: number;
       fromUserId: number;
       toUserId: number;
+      trx?: any;
     }) => {
-      const getInventory = async (userId: number) =>
-        strapi.db.query(INVENTORY_UID).findOne({
-          where: {
-            equipment: equipmentId,
-            users_permissions_user: userId,
-          },
-        });
-
-      const setQuantity = async (userId: number, nextQuantity: number) => {
-        const existing = await getInventory(userId);
-        if (existing) {
-          return strapi.db.query(INVENTORY_UID).update({
-            where: { id: existing.id },
-            data: { quantity: nextQuantity },
-          });
-        }
-
-        return strapi.db.query(INVENTORY_UID).create({
-          data: {
-            equipment: equipmentId,
-            users_permissions_user: userId,
-            quantity: nextQuantity,
-          },
-        });
-      };
-
       const decrease = async (userId: number, delta: number) => {
-        const existing = await getInventory(userId);
-        const currentQty = toNumber(existing?.quantity ?? 0);
+        const rows = await getInventoryRows(equipmentId, userId, trx);
+        const currentQty = toNumber(rows[0]?.quantity ?? 0);
         const nextQty = currentQty - delta;
         if (nextQty < 0) {
           return false;
         }
-        await setQuantity(userId, nextQty);
+        await setQuantity({ equipmentId, userId, nextQuantity: nextQty, trx });
         return true;
       };
 
       if (operationType === 'ПРИХОД') {
-        const existing = await getInventory(toUserId);
-        const currentQty = toNumber(existing?.quantity ?? 0);
-        await setQuantity(toUserId, currentQty + quantity);
+        const rows = await getInventoryRows(equipmentId, toUserId, trx);
+        const currentQty = toNumber(rows[0]?.quantity ?? 0);
+        await setQuantity({
+          equipmentId,
+          userId: toUserId,
+          nextQuantity: currentQty + quantity,
+          trx,
+        });
       }
 
       if (operationType === 'СПИСАНИЕ') {
@@ -108,94 +169,128 @@ export default factories.createCoreController(
         if (!ok) {
           throw new Error('Недостаточно остатка для перемещения');
         }
-        const existing = await getInventory(toUserId);
-        const currentQty = toNumber(existing?.quantity ?? 0);
-        await setQuantity(toUserId, currentQty + quantity);
+        const rows = await getInventoryRows(equipmentId, toUserId, trx);
+        const currentQty = toNumber(rows[0]?.quantity ?? 0);
+        await setQuantity({
+          equipmentId,
+          userId: toUserId,
+          nextQuantity: currentQty + quantity,
+          trx,
+        });
       }
     };
 
     return {
       async create(ctx) {
-      const body = (ctx.request.body ?? {}) as { data?: Record<string, unknown> };
-      const data = body.data ?? {};
+        const body = (ctx.request.body ?? {}) as { data?: Record<string, unknown> };
+        const data = body.data ?? {};
 
-      const operationType = String(data.operationType ?? '');
-      const allowedOperationTypes = ['ПРИХОД', 'СПИСАНИЕ', 'ПЕРЕМЕЩЕНИЕ'];
-      if (!allowedOperationTypes.includes(operationType)) {
-        return ctx.badRequest('operationType должен быть ПРИХОД, СПИСАНИЕ или ПЕРЕМЕЩЕНИЕ');
-      }
-
-      const quantity = toNumber(data.quantity);
-      if (!Number.isFinite(quantity) || quantity <= 0) {
-        return ctx.badRequest('quantity должен быть положительным числом');
-      }
-
-      const equipmentId = toNumber(data.equipment);
-      if (!Number.isFinite(equipmentId) || equipmentId <= 0) {
-        return ctx.badRequest('equipment обязателен');
-      }
-
-      const fromUserId = data.from_user ? toNumber(data.from_user) : NaN;
-      const toUserId = data.to_user ? toNumber(data.to_user) : NaN;
-
-      if (operationType === 'ПРИХОД') {
-        if (!Number.isFinite(toUserId) || toUserId <= 0) {
-          return ctx.badRequest('Для ПРИХОД необходимо указать to_user');
+        const currentUserId = toNumber(ctx.state.user?.id);
+        if (!Number.isFinite(currentUserId) || currentUserId <= 0) {
+          return ctx.unauthorized('Пользователь не авторизован');
         }
-      }
 
-      if (operationType === 'СПИСАНИЕ') {
-        if (!Number.isFinite(fromUserId) || fromUserId <= 0) {
-          return ctx.badRequest('Для СПИСАНИЕ необходимо указать from_user');
+        const currentUser = await getUserById(strapi, currentUserId);
+        if (!currentUser?.isResponsiblePerson) {
+          return ctx.forbidden('Создавать операции может только МОЛ/ответственный');
         }
-      }
 
-      if (operationType === 'ПЕРЕМЕЩЕНИЕ') {
-        if (!Number.isFinite(fromUserId) || fromUserId <= 0) {
-          return ctx.badRequest('Для ПЕРЕМЕЩЕНИЕ необходимо указать from_user');
+        const operationType = String(data.operationType ?? '');
+        const allowedOperationTypes = ['ПРИХОД', 'СПИСАНИЕ', 'ПЕРЕМЕЩЕНИЕ'];
+        if (!allowedOperationTypes.includes(operationType)) {
+          return ctx.badRequest('operationType должен быть ПРИХОД, СПИСАНИЕ или ПЕРЕМЕЩЕНИЕ');
         }
-        if (!Number.isFinite(toUserId) || toUserId <= 0) {
-          return ctx.badRequest('Для ПЕРЕМЕЩЕНИЕ необходимо указать to_user');
+
+        const quantity = toNumber(data.quantity);
+        if (!Number.isFinite(quantity) || quantity <= 0) {
+          return ctx.badRequest('quantity должен быть положительным числом');
         }
-        if (fromUserId === toUserId) {
-          return ctx.badRequest('from_user и to_user должны отличаться');
+
+        const equipmentId = toNumber(data.equipment);
+        if (!Number.isFinite(equipmentId) || equipmentId <= 0) {
+          return ctx.badRequest('equipment обязателен');
         }
-      }
-      if (operationType === 'ПРИХОД') {
+
+        const fromUserId = data.from_user ? toNumber(data.from_user) : NaN;
+        const toUserId = data.to_user ? toNumber(data.to_user) : NaN;
+
+        if (operationType === 'ПРИХОД') {
+          if (!Number.isFinite(toUserId) || toUserId <= 0) {
+            return ctx.badRequest('Для ПРИХОД необходимо указать to_user');
+          }
+          if (toUserId !== currentUserId) {
+            return ctx.forbidden('Операция за другого пользователя запрещена');
+          }
+        }
+
+        if (operationType === 'СПИСАНИЕ') {
+          if (!Number.isFinite(fromUserId) || fromUserId <= 0) {
+            return ctx.badRequest('Для СПИСАНИЕ необходимо указать from_user');
+          }
+          if (fromUserId !== currentUserId) {
+            return ctx.forbidden('Операция за другого пользователя запрещена');
+          }
+        }
+
+        if (operationType === 'ПЕРЕМЕЩЕНИЕ') {
+          if (!Number.isFinite(fromUserId) || fromUserId <= 0) {
+            return ctx.badRequest('Для ПЕРЕМЕЩЕНИЕ необходимо указать from_user');
+          }
+          if (fromUserId !== currentUserId) {
+            return ctx.forbidden('Операция за другого пользователя запрещена');
+          }
+          if (!Number.isFinite(toUserId) || toUserId <= 0) {
+            return ctx.badRequest('Для ПЕРЕМЕЩЕНИЕ необходимо указать to_user');
+          }
+          if (fromUserId === toUserId) {
+            return ctx.badRequest('from_user и to_user должны отличаться');
+          }
+        }
+
+        const trx = await strapi.db.connection.transaction();
         try {
-          await applyStockChange({
-            equipmentId,
-            operationType,
-            quantity,
-            fromUserId,
-            toUserId,
-          });
+          if (operationType === 'ПРИХОД') {
+            await applyStockChange({
+              equipmentId,
+              operationType,
+              quantity,
+              fromUserId,
+              toUserId,
+              trx,
+            });
+          }
+
+          const movement = await strapi.db.query(MOVEMENT_UID).create(
+            withTrx(
+              {
+                data: {
+                  operationType,
+                  quantity,
+                  note: data.note ?? null,
+                  movementDate: data.movementDate ?? new Date().toISOString(),
+                  status:
+                    operationType === 'ПЕРЕМЕЩЕНИЕ'
+                      ? 'PENDING_RECIPIENT'
+                      : operationType === 'СПИСАНИЕ'
+                        ? 'PENDING_MANAGER'
+                        : 'COMPLETED',
+                  equipment: equipmentId,
+                  from_user: Number.isFinite(fromUserId) ? fromUserId : null,
+                  to_user: Number.isFinite(toUserId) ? toUserId : null,
+                  performed_by: currentUserId,
+                },
+              },
+              trx
+            )
+          );
+
+          await trx.commit();
+          return this.transformResponse(movement);
         } catch (error) {
+          await trx.rollback();
           return ctx.badRequest(error instanceof Error ? error.message : 'Ошибка движения');
         }
-      }
-
-      const movement = await strapi.db.query(MOVEMENT_UID).create({
-        data: {
-          operationType,
-          quantity,
-          note: data.note ?? null,
-          movementDate: data.movementDate ?? new Date().toISOString(),
-          status:
-            operationType === 'ПЕРЕМЕЩЕНИЕ'
-              ? 'PENDING_RECIPIENT'
-              : operationType === 'СПИСАНИЕ'
-                ? 'PENDING_MANAGER'
-                : 'COMPLETED',
-          equipment: equipmentId,
-          from_user: Number.isFinite(fromUserId) ? fromUserId : null,
-          to_user: Number.isFinite(toUserId) ? toUserId : null,
-          performed_by: ctx.state.user?.id ?? null,
-        },
-      });
-
-      return this.transformResponse(movement);
-    },
+      },
 
       async approveRecipient(ctx) {
       const movementId = toNumber(ctx.params.id);
@@ -279,6 +374,7 @@ export default factories.createCoreController(
       const toUserId = relationId(movement.to_user);
       const quantity = toNumber(movement.quantity);
 
+      const trx = await strapi.db.connection.transaction();
       try {
         await applyStockChange({
           equipmentId,
@@ -286,20 +382,28 @@ export default factories.createCoreController(
           quantity,
           fromUserId,
           toUserId,
+          trx,
         });
+
+        const updated = await strapi.db.query(MOVEMENT_UID).update(
+          withTrx(
+            {
+              where: { id: movementId },
+              data: {
+                status: 'COMPLETED',
+                managerApprovedAt: new Date().toISOString(),
+              },
+            },
+            trx
+          )
+        );
+
+        await trx.commit();
+        return this.transformResponse(updated);
       } catch (error) {
+        await trx.rollback();
         return ctx.badRequest(error instanceof Error ? error.message : 'Ошибка движения');
       }
-
-      const updated = await strapi.db.query(MOVEMENT_UID).update({
-        where: { id: movementId },
-        data: {
-          status: 'COMPLETED',
-          managerApprovedAt: new Date().toISOString(),
-        },
-      });
-
-      return this.transformResponse(updated);
       },
 
       async rejectManager(ctx) {

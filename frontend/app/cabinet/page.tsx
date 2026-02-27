@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
 import AppNavbar from "@/components/app-navbar";
 import { getApiUrl } from "@/lib/auth";
+import { formatDateTimeAlmaty } from "@/lib/datetime";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -26,7 +27,13 @@ type NotificationRow = {
   createdAt: string;
   isRead: boolean;
 };
-const ALMATY_TIME_ZONE = "Asia/Almaty";
+
+type Profile = {
+  firstName: string;
+  lastName: string;
+  position: string;
+  department: string;
+};
 
 function getItems(payload: unknown): UnknownRecord[] {
   if (!payload) return [];
@@ -71,21 +78,6 @@ function unwrap(value: unknown) {
   return asRecord;
 }
 
-function formatDateTimeAlmaty(value: string) {
-  if (!value) return "—";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return new Intl.DateTimeFormat("ru-RU", {
-    timeZone: ALMATY_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(parsed);
-}
-
 export default function Home() {
   const [rows, setRows] = useState<TaskRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,6 +86,17 @@ export default function Home() {
   const [rejectOpenId, setRejectOpenId] = useState("");
   const [rejectReason, setRejectReason] = useState("");
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
+  const [profile, setProfile] = useState<Profile>({
+    firstName: "",
+    lastName: "",
+    position: "",
+    department: "",
+  });
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [profileSuccess, setProfileSuccess] = useState("");
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
 
   const currentUser = (() => {
     if (typeof window === "undefined") return { id: "", isManager: false };
@@ -116,7 +119,7 @@ export default function Home() {
       setLoading(true);
       setError("");
       const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
       const params = new URLSearchParams();
       params.append("filters[status][$in][0]", "PENDING_RECIPIENT");
       params.append("filters[status][$in][1]", "PENDING_MANAGER");
@@ -184,6 +187,88 @@ export default function Home() {
   useEffect(() => {
     loadTasks();
   }, [loadTasks]);
+
+  useEffect(() => {
+    async function loadProfile() {
+      try {
+        setProfileLoading(true);
+        setProfileError("");
+        const token = localStorage.getItem("token");
+        if (!token) throw new Error("Сессия не найдена");
+
+        const response = await fetch(`${getApiUrl()}/api/account/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Не удалось загрузить профиль");
+        }
+
+        const payload = (await response.json()) as { data?: Record<string, unknown> };
+        const row = payload.data ?? {};
+        setProfile({
+          firstName: typeof row.firstName === "string" ? row.firstName : "",
+          lastName: typeof row.lastName === "string" ? row.lastName : "",
+          position: typeof row.position === "string" ? row.position : "",
+          department: typeof row.department === "string" ? row.department : "",
+        });
+      } catch (loadError) {
+        const message =
+          loadError instanceof Error ? loadError.message : "Ошибка загрузки профиля";
+        if (message !== "Не удалось загрузить профиль") {
+          setProfileError(message);
+        }
+      } finally {
+        setProfileLoading(false);
+      }
+    }
+
+    loadProfile();
+  }, []);
+
+  async function saveProfile() {
+    try {
+      setProfileSaving(true);
+      setProfileError("");
+      setProfileSuccess("");
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("Сессия не найдена");
+
+      const response = await fetch(`${getApiUrl()}/api/account/me`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ data: profile }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Не удалось сохранить профиль");
+      }
+
+      const rawUser = localStorage.getItem("user");
+      if (rawUser) {
+        try {
+          const user = JSON.parse(rawUser) as Record<string, unknown>;
+          const nextUser = { ...user, ...profile };
+          localStorage.setItem("user", JSON.stringify(nextUser));
+        } catch {
+          // ignore malformed localStorage user
+        }
+      }
+
+      setIsEditingProfile(false);
+      setProfileSuccess("Профиль сохранен");
+    } catch (saveError) {
+      setProfileError(saveError instanceof Error ? saveError.message : "Ошибка сохранения профиля");
+    } finally {
+      setProfileSaving(false);
+    }
+  }
 
   async function approveRecipient(id: string) {
     try {
@@ -278,6 +363,97 @@ export default function Home() {
         <div className="rounded-2xl border bg-white p-8">
           <h2 className="text-3xl font-semibold">Личный кабинет</h2>
           <p className="mt-2 text-zinc-600">Задачи на согласование и утверждение перемещений.</p>
+        </div>
+
+        <div className="mt-6 rounded-2xl border bg-white p-6">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-xl font-semibold">Профиль</h3>
+            {isEditingProfile ? (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="rounded-md border px-3 py-1 text-sm hover:bg-zinc-100"
+                  onClick={() => setIsEditingProfile(false)}
+                  disabled={profileSaving}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md bg-black px-3 py-1 text-sm text-white disabled:opacity-60"
+                  onClick={saveProfile}
+                  disabled={profileSaving}
+                >
+                  {profileSaving ? "Сохранение..." : "Сохранить"}
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="rounded-md border px-3 py-1 text-sm hover:bg-zinc-100"
+                onClick={() => {
+                  setProfileSuccess("");
+                  setProfileError("");
+                  setIsEditingProfile(true);
+                }}
+              >
+                Редактировать
+              </button>
+            )}
+          </div>
+
+          {profileLoading ? <p className="mt-3 text-zinc-600">Загрузка профиля...</p> : null}
+          {profileError ? <p className="mt-3 text-red-600">{profileError}</p> : null}
+          {profileSuccess ? <p className="mt-3 text-green-700">{profileSuccess}</p> : null}
+
+          {!profileLoading ? (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <label className="text-sm text-zinc-700">
+                Имя
+                <input
+                  className="mt-1 w-full rounded-md border px-3 py-2"
+                  value={profile.firstName}
+                  onChange={(event) =>
+                    setProfile((prev) => ({ ...prev, firstName: event.target.value }))
+                  }
+                  disabled={!isEditingProfile}
+                />
+              </label>
+              <label className="text-sm text-zinc-700">
+                Фамилия
+                <input
+                  className="mt-1 w-full rounded-md border px-3 py-2"
+                  value={profile.lastName}
+                  onChange={(event) =>
+                    setProfile((prev) => ({ ...prev, lastName: event.target.value }))
+                  }
+                  disabled={!isEditingProfile}
+                />
+              </label>
+              <label className="text-sm text-zinc-700">
+                Должность
+                <input
+                  className="mt-1 w-full rounded-md border px-3 py-2"
+                  value={profile.position}
+                  onChange={(event) =>
+                    setProfile((prev) => ({ ...prev, position: event.target.value }))
+                  }
+                  disabled={!isEditingProfile}
+                />
+              </label>
+              <label className="text-sm text-zinc-700">
+                Отдел, Группа
+                <input
+                  className="mt-1 w-full rounded-md border px-3 py-2"
+                  value={profile.department}
+                  onChange={(event) =>
+                    setProfile((prev) => ({ ...prev, department: event.target.value }))
+                  }
+                  disabled={!isEditingProfile}
+                />
+              </label>
+            </div>
+          ) : null}
         </div>
 
         <div className="mt-6 rounded-2xl border bg-white p-6">

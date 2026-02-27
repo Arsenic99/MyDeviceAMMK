@@ -14,6 +14,14 @@ type LocalUser = {
 };
 
 type UnknownRecord = Record<string, unknown>;
+type ApiErrorPayload = {
+  error?: {
+    message?: string;
+    details?: {
+      errors?: Array<{ message?: string }>;
+    };
+  };
+};
 
 function parseUser(rawUser: string | null): LocalUser {
   if (!rawUser) return {};
@@ -80,6 +88,13 @@ function unwrap(value: unknown) {
     return asRecord.data as UnknownRecord;
   }
   return asRecord;
+}
+
+async function readApiErrorMessage(response: Response, fallback: string) {
+  const payload = (await response.json().catch(() => ({}))) as ApiErrorPayload;
+  const detailed = payload.error?.details?.errors?.[0]?.message;
+  const message = payload.error?.message;
+  return detailed || message || fallback;
 }
 
 export default function AppNavbar() {
@@ -201,7 +216,7 @@ export default function AppNavbar() {
       });
 
       if (!equipmentResponse.ok) {
-        throw new Error("Не удалось создать оборудование");
+        throw new Error(await readApiErrorMessage(equipmentResponse, "Не удалось создать оборудование"));
       }
 
       const equipmentPayload = (await equipmentResponse.json()) as
@@ -237,7 +252,7 @@ export default function AppNavbar() {
       });
 
       if (!arrivalResponse.ok) {
-        throw new Error("Не удалось зафиксировать приход");
+        throw new Error(await readApiErrorMessage(arrivalResponse, "Не удалось зафиксировать приход"));
       }
 
       closeModal();
@@ -372,6 +387,7 @@ export default function AppNavbar() {
               >
                 <option value="ТМЦ">ТМЦ</option>
                 <option value="ОС">ОС</option>
+                <option value="Оборудование">Оборудование</option>
               </select>
               {submitError ? <p className="text-sm text-red-600">{submitError}</p> : null}
               <button
