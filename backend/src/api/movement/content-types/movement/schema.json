@@ -1,0 +1,79 @@
+{
+  "kind": "collectionType",
+  "collectionName": "movements",
+  "info": {
+    "singularName": "movement",
+    "pluralName": "movements",
+    "displayName": "Movement"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "operationType": {
+      "type": "enumeration",
+      "enum": [
+        "ПРИХОД",
+        "СПИСАНИЕ",
+        "ПЕРЕМЕЩЕНИЕ"
+      ],
+      "required": true
+    },
+    "quantity": {
+      "type": "decimal",
+      "required": true
+    },
+    "note": {
+      "type": "text"
+    },
+    "movementDate": {
+      "type": "datetime",
+      "required": true
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": [
+        "PENDING_RECIPIENT",
+        "PENDING_MANAGER",
+        "COMPLETED",
+        "REJECTED"
+      ],
+      "required": true,
+      "default": "COMPLETED"
+    },
+    "recipientApprovedAt": {
+      "type": "datetime"
+    },
+    "managerApprovedAt": {
+      "type": "datetime"
+    },
+    "managerRejectedAt": {
+      "type": "datetime"
+    },
+    "equipment": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::equipment.equipment",
+      "inversedBy": "movements"
+    },
+    "from_user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "movement_from"
+    },
+    "to_user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "movement_to"
+    },
+    "performed_by": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "movement_performed"
+    }
+  }
+}

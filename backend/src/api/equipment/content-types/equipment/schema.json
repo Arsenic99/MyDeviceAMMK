@@ -1,0 +1,62 @@
+{
+  "kind": "collectionType",
+  "collectionName": "equipments",
+  "info": {
+    "singularName": "equipment",
+    "pluralName": "equipments",
+    "displayName": "Equipment"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "description": {
+      "type": "string"
+    },
+    "unit": {
+      "type": "enumeration",
+      "required": true,
+      "default": "шт",
+      "enum": [
+        "шт",
+        "кг",
+        "т",
+        "м",
+        "л",
+        "м3",
+        "рулон",
+        "упаковка"
+      ]
+    },
+    "inventories": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::inventory.inventory",
+      "mappedBy": "equipment"
+    },
+    "movements": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::movement.movement",
+      "mappedBy": "equipment"
+    },
+    "article": {
+      "type": "string",
+      "unique": true
+    },
+    "category": {
+      "type": "enumeration",
+      "required": true,
+      "default": "ТМЦ",
+      "enum": [
+        "ОС",
+        "ТМЦ"
+      ]
+    }
+  }
+}

@@ -11,8 +11,15 @@
   },
   "pluginOptions": {},
   "attributes": {
-    "name": {
-      "type": "string"
+    "unit": {
+      "type": "enumeration",
+      "enum": [
+        "шт",
+        "т",
+        "рулон",
+        "коробка",
+        "упаковка"
+      ]
     }
   }
 }

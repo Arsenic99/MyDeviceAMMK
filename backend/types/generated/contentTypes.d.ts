@@ -430,31 +430,194 @@ export interface AdminUser extends Struct.CollectionTypeSchema {
   };
 }
 
-export interface ApiCategoryCategory extends Struct.CollectionTypeSchema {
-  collectionName: 'categories';
+export interface ApiEquipmentEquipment extends Struct.CollectionTypeSchema {
+  collectionName: 'equipments';
   info: {
-    displayName: 'Category';
-    pluralName: 'categories';
-    singularName: 'category';
+    displayName: 'Equipment';
+    pluralName: 'equipments';
+    singularName: 'equipment';
   };
   options: {
-    draftAndPublish: true;
+    draftAndPublish: false;
+  };
+  attributes: {
+    article: Schema.Attribute.String & Schema.Attribute.Unique;
+    category: Schema.Attribute.Enumeration<
+      ['\u041E\u0421', '\u0422\u041C\u0426']
+    > &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'\u0422\u041C\u0426'>;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    description: Schema.Attribute.String;
+    inventories: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::inventory.inventory'
+    >;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::equipment.equipment'
+    > &
+      Schema.Attribute.Private;
+    movements: Schema.Attribute.Relation<'oneToMany', 'api::movement.movement'>;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    publishedAt: Schema.Attribute.DateTime;
+    unit: Schema.Attribute.Enumeration<
+      [
+        '\u0448\u0442',
+        '\u043A\u0433',
+        '\u0442',
+        '\u043C',
+        '\u043B',
+        '\u043C3',
+        '\u0440\u0443\u043B\u043E\u043D',
+        '\u0443\u043F\u0430\u043A\u043E\u0432\u043A\u0430',
+      ]
+    > &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'\u0448\u0442'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiInventoryInventory extends Struct.CollectionTypeSchema {
+  collectionName: 'inventories';
+  info: {
+    displayName: 'Inventory';
+    pluralName: 'inventories';
+    singularName: 'inventory';
+  };
+  options: {
+    draftAndPublish: false;
   };
   attributes: {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    description: Schema.Attribute.String;
+    equipment: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::equipment.equipment'
+    >;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
-      'api::category.category'
+      'api::inventory.inventory'
     > &
       Schema.Attribute.Private;
     publishedAt: Schema.Attribute.DateTime;
+    quantity: Schema.Attribute.Decimal &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<0>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    users_permissions_user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+  };
+}
+
+export interface ApiMovementMovement extends Struct.CollectionTypeSchema {
+  collectionName: 'movements';
+  info: {
+    displayName: 'Movement';
+    pluralName: 'movements';
+    singularName: 'movement';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    equipment: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::equipment.equipment'
+    >;
+    from_user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::movement.movement'
+    > &
+      Schema.Attribute.Private;
+    managerApprovedAt: Schema.Attribute.DateTime;
+    managerRejectedAt: Schema.Attribute.DateTime;
+    movementDate: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    note: Schema.Attribute.Text;
+    operationType: Schema.Attribute.Enumeration<
+      [
+        '\u041F\u0420\u0418\u0425\u041E\u0414',
+        '\u0421\u041F\u0418\u0421\u0410\u041D\u0418\u0415',
+        '\u041F\u0415\u0420\u0415\u041C\u0415\u0429\u0415\u041D\u0418\u0415',
+      ]
+    > &
+      Schema.Attribute.Required;
+    performed_by: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    publishedAt: Schema.Attribute.DateTime;
+    quantity: Schema.Attribute.Decimal & Schema.Attribute.Required;
+    recipientApprovedAt: Schema.Attribute.DateTime;
+    status: Schema.Attribute.Enumeration<
+      ['PENDING_RECIPIENT', 'PENDING_MANAGER', 'COMPLETED', 'REJECTED']
+    > &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'COMPLETED'>;
+    to_user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiNotificationNotification
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'notifications';
+  info: {
+    displayName: 'Notification';
+    pluralName: 'notifications';
+    singularName: 'notification';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    isRead: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::notification.notification'
+    > &
+      Schema.Attribute.Private;
+    message: Schema.Attribute.Text & Schema.Attribute.Required;
+    movement: Schema.Attribute.Relation<'manyToOne', 'api::movement.movement'>;
+    publishedAt: Schema.Attribute.DateTime;
+    type: Schema.Attribute.Enumeration<['WRITE_OFF_REJECTED']> &
+      Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
   };
 }
 
@@ -475,8 +638,16 @@ export interface ApiUnitUnit extends Struct.CollectionTypeSchema {
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::unit.unit'> &
       Schema.Attribute.Private;
-    name: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
+    unit: Schema.Attribute.Enumeration<
+      [
+        '\u0448\u0442',
+        '\u0442',
+        '\u0440\u0443\u043B\u043E\u043D',
+        '\u043A\u043E\u0440\u043E\u0431\u043A\u0430',
+        '\u0443\u043F\u0430\u043A\u043E\u0432\u043A\u0430',
+      ]
+    >;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -939,7 +1110,6 @@ export interface PluginUsersPermissionsUser
   };
   options: {
     draftAndPublish: false;
-    timestamps: true;
   };
   attributes: {
     blocked: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
@@ -953,12 +1123,35 @@ export interface PluginUsersPermissionsUser
       Schema.Attribute.SetMinMaxLength<{
         minLength: 6;
       }>;
+    inventories: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::inventory.inventory'
+    >;
+    isManager: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    isResponsiblePerson: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
       'plugin::users-permissions.user'
     > &
       Schema.Attribute.Private;
+    movement_from: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::movement.movement'
+    >;
+    movement_performed: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::movement.movement'
+    >;
+    movement_to: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::movement.movement'
+    >;
+    notifications: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::notification.notification'
+    >;
     password: Schema.Attribute.Password &
       Schema.Attribute.Private &
       Schema.Attribute.SetMinMaxLength<{
@@ -994,7 +1187,10 @@ declare module '@strapi/strapi' {
       'admin::transfer-token': AdminTransferToken;
       'admin::transfer-token-permission': AdminTransferTokenPermission;
       'admin::user': AdminUser;
-      'api::category.category': ApiCategoryCategory;
+      'api::equipment.equipment': ApiEquipmentEquipment;
+      'api::inventory.inventory': ApiInventoryInventory;
+      'api::movement.movement': ApiMovementMovement;
+      'api::notification.notification': ApiNotificationNotification;
       'api::unit.unit': ApiUnitUnit;
       'plugin::content-releases.release': PluginContentReleasesRelease;
       'plugin::content-releases.release-action': PluginContentReleasesReleaseAction;
