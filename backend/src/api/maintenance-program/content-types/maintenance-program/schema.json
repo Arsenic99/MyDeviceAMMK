@@ -1,0 +1,28 @@
+{
+  "kind": "collectionType",
+  "collectionName": "maintenance_programs",
+  "info": {
+    "singularName": "maintenance-program",
+    "pluralName": "maintenance-programs",
+    "displayName": "Maintenance Program"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "activities": {
+      "type": "json"
+    },
+    "equipment": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::equipment.equipment",
+      "required": true
+    }
+  }
+}

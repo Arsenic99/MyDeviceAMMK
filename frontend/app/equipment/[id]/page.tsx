@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { type ChangeEvent, useEffect, useState } from "react";
+import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from "react";
 import AppNavbar from "@/components/app-navbar";
 import { getApiUrl } from "@/lib/auth";
 import { formatDateTimeAlmaty } from "@/lib/datetime";
@@ -20,6 +20,13 @@ type DocumentRow = {
   url: string;
   size: string;
   updatedAt: string;
+};
+
+type ProgramItem = {
+  id: string;
+  recordKey: string;
+  title: string;
+  activities: string[];
 };
 
 type EquipmentDetails = {
@@ -133,6 +140,20 @@ export default function EquipmentDetailsPage() {
   const [documentDeletingId, setDocumentDeletingId] = useState("");
   const [documentInputKey, setDocumentInputKey] = useState(0);
   const [currentUserId, setCurrentUserId] = useState("");
+  const [programs, setPrograms] = useState<ProgramItem[]>([]);
+  const [showProgramModal, setShowProgramModal] = useState(false);
+  const [programMenuId, setProgramMenuId] = useState<string | null>(null);
+  const [programEditModeId, setProgramEditModeId] = useState<string | null>(null);
+  const [programTitle, setProgramTitle] = useState("");
+  const [programsLoading, setProgramsLoading] = useState(false);
+  const [programsError, setProgramsError] = useState("");
+  const [showActivityModal, setShowActivityModal] = useState(false);
+  const [activityProgramId, setActivityProgramId] = useState("");
+  const [activityValue, setActivityValue] = useState("");
+  const [actSavingProgramId, setActSavingProgramId] = useState("");
+  const [showActModal, setShowActModal] = useState(false);
+  const [actProgramId, setActProgramId] = useState("");
+  const [actImages, setActImages] = useState<File[]>([]);
 
   useEffect(() => {
     const rawUser = localStorage.getItem("user");
@@ -314,6 +335,445 @@ export default function EquipmentDetailsPage() {
 
     load();
   }, [params.id, router]);
+
+  const maintenanceEquipmentKey = useMemo(() => {
+    if (!data) return "";
+    return data.equipmentDocumentId || data.equipmentId || data.inventoryId;
+  }, [data]);
+
+  const maintenancePrograms = useMemo(() => {
+    return [...programs].sort((a, b) => a.title.localeCompare(b.title));
+  }, [programs]);
+
+  useEffect(() => {
+    async function loadPrograms() {
+      if (!data || data.category !== "Оборудование") {
+        setPrograms([]);
+        return;
+      }
+
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setPrograms([]);
+        return;
+      }
+
+      const equipmentFilterKey = data.equipmentDocumentId || data.equipmentId;
+      if (!equipmentFilterKey) {
+        setPrograms([]);
+        return;
+      }
+
+      setProgramsLoading(true);
+      setProgramsError("");
+      try {
+        const params = new URLSearchParams();
+        if (data.equipmentDocumentId) {
+          params.append("filters[equipment][documentId][$eq]", data.equipmentDocumentId);
+        } else {
+          params.append("filters[equipment][id][$eq]", data.equipmentId);
+        }
+        params.append("sort[0]", "title:asc");
+
+        const response = await fetch(
+          `${getApiUrl()}/api/maintenance-programs?${params.toString()}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        if (!response.ok) {
+          throw new Error("Не удалось загрузить программы ТО");
+        }
+
+        const payload = await response.json();
+        const rows = getItems(payload).map((row) => {
+          const rawActivities = row.activities;
+          const activities = Array.isArray(rawActivities)
+            ? rawActivities.map((value) => String(value).trim()).filter(Boolean)
+            : [];
+
+          const id = getText(row, "id");
+          const documentId = getText(row, "documentId");
+          return {
+            id: documentId || id,
+            recordKey: documentId || id,
+            title: getText(row, "title") || "Программа ТО",
+            activities,
+          } as ProgramItem;
+        });
+
+        setPrograms(rows.filter((item) => item.recordKey));
+      } catch (loadError) {
+        setPrograms([]);
+        setProgramsError(
+          loadError instanceof Error ? loadError.message : "Ошибка загрузки программ ТО"
+        );
+      } finally {
+        setProgramsLoading(false);
+      }
+    }
+
+    loadPrograms();
+  }, [data]);
+
+  function resetProgramForm() {
+    setProgramTitle("");
+  }
+
+  function openCreateProgramModal() {
+    resetProgramForm();
+    setShowProgramModal(true);
+  }
+
+  function closeProgramModal() {
+    setShowProgramModal(false);
+    resetProgramForm();
+  }
+
+  async function saveProgram(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!maintenanceEquipmentKey || !data) return;
+
+    const title = programTitle.trim();
+    if (!title) return;
+
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      const response = await fetch(`${getApiUrl()}/api/maintenance-programs`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          data: {
+            title,
+            equipment: Number(data.equipmentId),
+            activities: [],
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Не удалось создать программу ТО");
+      }
+
+      const payload = await response.json();
+      const entry = unwrapOne(
+        "data" in (payload as UnknownRecord)
+          ? (payload as { data?: UnknownRecord }).data
+          : (payload as UnknownRecord)
+      );
+      const id = getText(entry, "id");
+      const documentId = getText(entry, "documentId");
+      const created: ProgramItem = {
+        id: documentId || id,
+        recordKey: documentId || id,
+        title: getText(entry, "title") || title,
+        activities: [],
+      };
+
+      setPrograms((prev) => [...prev, created].sort((a, b) => a.title.localeCompare(b.title)));
+      closeProgramModal();
+    } catch (saveError) {
+      setProgramsError(saveError instanceof Error ? saveError.message : "Ошибка создания программы ТО");
+    }
+  }
+
+  async function deleteProgram(program: ProgramItem) {
+    const confirmed = window.confirm("Удалить таблицу программы ТО?");
+    if (!confirmed) return;
+
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      const response = await fetch(`${getApiUrl()}/api/maintenance-programs/${program.recordKey}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error("Не удалось удалить программу ТО");
+      }
+      setPrograms((prev) => prev.filter((item) => item.id !== program.id));
+      setProgramEditModeId((prev) => (prev === program.id ? null : prev));
+      setProgramMenuId(null);
+    } catch (deleteError) {
+      setProgramsError(
+        deleteError instanceof Error ? deleteError.message : "Ошибка удаления программы ТО"
+      );
+    }
+  }
+
+  async function updateProgramActivities(program: ProgramItem, activities: string[]) {
+    const token = localStorage.getItem("token");
+    if (!token) return false;
+
+    const nextActivities = activities.map((value) => value.trim()).filter(Boolean);
+    try {
+      const response = await fetch(`${getApiUrl()}/api/maintenance-programs/${program.recordKey}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          data: {
+            activities: nextActivities,
+          },
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("Не удалось обновить мероприятия");
+      }
+      setPrograms((prev) =>
+        prev.map((item) => (item.id === program.id ? { ...item, activities: nextActivities } : item))
+      );
+      return true;
+    } catch (updateError) {
+      setProgramsError(
+        updateError instanceof Error ? updateError.message : "Ошибка обновления мероприятий"
+      );
+      return false;
+    }
+  }
+
+  function openAddActivityModal(program: ProgramItem) {
+    setActivityProgramId(program.id);
+    setActivityValue("");
+    setShowActivityModal(true);
+  }
+
+  function closeAddActivityModal() {
+    setShowActivityModal(false);
+    setActivityProgramId("");
+    setActivityValue("");
+  }
+
+  async function submitAddActivity(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const value = activityValue.trim();
+    if (!value) return;
+    const targetProgram = maintenancePrograms.find((program) => program.id === activityProgramId);
+    if (!targetProgram) return;
+
+    const ok = await updateProgramActivities(targetProgram, [...targetProgram.activities, value]);
+    if (ok) closeAddActivityModal();
+  }
+
+  function openActModal(program: ProgramItem) {
+    setActProgramId(program.id);
+    setActImages([]);
+    setShowActModal(true);
+    setProgramMenuId(null);
+  }
+
+  function closeActModal() {
+    if (actSavingProgramId) return;
+    setShowActModal(false);
+    setActProgramId("");
+    setActImages([]);
+  }
+
+  function onActImagesChange(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files || []);
+    setActImages(files);
+  }
+
+  async function readAsDataUrl(file: File) {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(new Error("Не удалось прочитать изображение"));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function submitAct() {
+    const targetProgram = maintenancePrograms.find((program) => program.id === actProgramId);
+    if (!targetProgram) return;
+    await buildAct(targetProgram, actImages);
+  }
+
+  async function buildAct(program: ProgramItem, imageFiles: File[] = []) {
+    if (!data) return;
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    setActSavingProgramId(program.id);
+    setProgramMenuId(null);
+    setDocumentUploadError("");
+
+    try {
+      const equipmentLabel = data.name || "Оборудование";
+      const actDate = new Date().toLocaleDateString("ru-RU");
+      const activitiesHtml =
+        program.activities.length > 0
+          ? `<ol>${program.activities
+              .map((activity) => `<li>${activity.replaceAll("<", "&lt;")}</li>`)
+              .join("")}</ol>`
+          : "<p>—</p>";
+      const imageDataUrls = await Promise.all(imageFiles.map((file) => readAsDataUrl(file)));
+      const imagesHtml =
+        imageDataUrls.length > 0
+          ? `<p class="gap"><strong>Фото:</strong></p>
+             ${imageDataUrls
+               .map(
+                 (url, index) =>
+                   `<p style="margin: 8px 0;"><img src="${url}" alt="Фото ${index + 1}" style="max-width: 100%; max-height: 420px;" /></p>`
+               )
+               .join("")}`
+          : "";
+
+      const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Акт ТО</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.4; }
+    h1 { font-size: 16pt; margin-bottom: 8px; text-align: center; }
+    p { margin: 6px 0; }
+    .gap { margin-top: 14px; }
+    table.sign-table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+    table.sign-table td { vertical-align: bottom; height: 30px; }
+    table.sign-table td.label { width: 120px; }
+    table.sign-table td.line { border-bottom: 1px solid #000; }
+  </style>
+</head>
+<body>
+  <h1>АКТ ВЫПОЛНЕНИЯ ТО</h1>
+  <p><strong>Дата:</strong> ${actDate}</p>
+  <p><strong>Программа:</strong> ${program.title}</p>
+  <p><strong>Оборудование:</strong> ${equipmentLabel}</p>
+  <p class="gap"><strong>Мероприятия:</strong></p>
+  ${activitiesHtml}
+  ${imagesHtml}
+  <table class="sign-table">
+    <tr>
+      <td class="label"><strong>Результат:</strong></td>
+      <td class="line"></td>
+    </tr>
+    <tr>
+      <td class="line"></td>
+      <td class="line"></td>
+    </tr>
+    <tr>
+      <td class="label"><strong>Комментарий:</strong></td>
+      <td class="line"></td>
+    </tr>
+    <tr>
+      <td class="line"></td>
+      <td class="line"></td>
+    </tr>
+    <tr>
+      <td class="label"><strong>Выполнил:</strong></td>
+      <td class="line"></td>
+    </tr>
+    <tr>
+      <td class="label"><strong>Утвердил:</strong></td>
+      <td class="line"></td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+      const blob = new Blob([html], { type: "application/msword" });
+      const fileDate = new Date().toLocaleDateString("ru-RU");
+      const fileBaseTitle = (program.title || "акт")
+        .replace(/[\\/:*?"<>|]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      const fileName = `${fileBaseTitle} ${fileDate}.doc`;
+      const file = new File([blob], fileName, { type: "application/msword" });
+
+      const uploadOnce = async (refId: string) => {
+        const formData = new FormData();
+        formData.append("files", file);
+        formData.append("ref", "api::equipment.equipment");
+        formData.append("refId", refId);
+        formData.append("field", "documents");
+
+        return fetch(`${getApiUrl()}/api/upload`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        });
+      };
+
+      let response = await uploadOnce(data.equipmentDocumentId || data.equipmentId);
+      if (!response.ok && data.equipmentDocumentId && data.equipmentId) {
+        response = await uploadOnce(data.equipmentId);
+      }
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Не удалось сохранить акт в документы");
+      }
+
+      const payload = (await response.json()) as unknown;
+      const uploadedRows = (Array.isArray(payload) ? payload : []).map((fileRow) => {
+        const entry = fileRow as UnknownRecord;
+        const fileUrl = getText(entry, "url");
+        return {
+          id: getText(entry, "id") || getText(entry, "documentId") || fileUrl,
+          name: getText(entry, "name") || "Файл",
+          url: toFileUrl(fileUrl),
+          size: toFileSizeLabel(getText(entry, "size")),
+          updatedAt: getText(entry, "updatedAt") || getText(entry, "createdAt"),
+        };
+      });
+
+      if (uploadedRows.length > 0) {
+        setData((prev) => {
+          if (!prev) return prev;
+          const next = [...uploadedRows, ...prev.documents];
+          const seen = new Set<string>();
+          return {
+            ...prev,
+            documents: next.filter((row) => {
+              if (!row.id || seen.has(row.id)) return false;
+              seen.add(row.id);
+              return true;
+            }),
+          };
+        });
+      }
+      closeActModal();
+    } catch (actError) {
+      setDocumentUploadError(
+        actError instanceof Error ? actError.message : "Ошибка формирования акта"
+      );
+    } finally {
+      setActSavingProgramId("");
+    }
+  }
+
+  async function editActivity(programId: string, index: number) {
+    const targetProgram = maintenancePrograms.find((program) => program.id === programId);
+    const currentValue = targetProgram?.activities[index] || "";
+    const value = window.prompt("Изменить мероприятие", currentValue);
+    if (value === null) return;
+    const nextValue = value.trim();
+    if (!nextValue || !targetProgram) return;
+
+    const nextActivities = [...targetProgram.activities];
+    nextActivities[index] = nextValue;
+    await updateProgramActivities(targetProgram, nextActivities);
+  }
+
+  async function deleteActivity(programId: string, index: number) {
+    const confirmed = window.confirm("Удалить мероприятие?");
+    if (!confirmed) return;
+    const targetProgram = maintenancePrograms.find((program) => program.id === programId);
+    if (!targetProgram) return;
+    const nextActivities = targetProgram.activities.filter((_, activityIndex) => activityIndex !== index);
+    await updateProgramActivities(targetProgram, nextActivities);
+  }
 
   async function createTransfer() {
     if (!data) return;
@@ -718,6 +1178,147 @@ export default function EquipmentDetailsPage() {
 
               {data.category === "Оборудование" ? (
                 <div className="rounded-xl border p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-lg font-semibold">Программа ТО</h3>
+                    <button
+                      type="button"
+                      className="rounded-md bg-black px-3 py-2 text-sm text-white"
+                      onClick={openCreateProgramModal}
+                    >
+                      Добавить программу
+                    </button>
+                  </div>
+                  <div className="mt-3 space-y-4">
+                    {programsLoading ? (
+                      <p className="text-sm text-zinc-500">Загрузка программ ТО...</p>
+                    ) : null}
+                    {programsError ? (
+                      <p className="text-sm text-red-600">{programsError}</p>
+                    ) : null}
+                    {maintenancePrograms.length === 0 ? (
+                      <div className="rounded-lg border bg-white p-4 text-sm text-zinc-600">
+                        Программы ТО для этого оборудования пока не добавлены.
+                      </div>
+                    ) : (
+                      maintenancePrograms.map((program) => (
+                        <div key={program.id} className="overflow-hidden rounded-lg border">
+                          <div className="flex items-center justify-between border-b px-4 py-3">
+                            <h4 className="font-medium">{program.title}</h4>
+                            <div className="relative">
+                              <button
+                                type="button"
+                                className="rounded-md border px-3 py-1.5 text-sm"
+                                onClick={() =>
+                                  setProgramMenuId((prev) => (prev === program.id ? null : program.id))
+                                }
+                              >
+                                Действия
+                              </button>
+                              {programMenuId === program.id ? (
+                                <div className="absolute right-0 z-10 mt-2 w-48 rounded-md border bg-white p-1 shadow">
+                                  <button
+                                    type="button"
+                                    className="block w-full rounded px-3 py-2 text-left text-sm hover:bg-zinc-100"
+                                    onClick={() => {
+                                      setProgramEditModeId((prev) =>
+                                        prev === program.id ? null : program.id
+                                      );
+                                      setProgramMenuId(null);
+                                    }}
+                                  >
+                                    Редактировать
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="block w-full rounded px-3 py-2 text-left text-sm hover:bg-zinc-100"
+                                    onClick={() => openActModal(program)}
+                                    disabled={actSavingProgramId === program.id}
+                                  >
+                                    {actSavingProgramId === program.id
+                                      ? "Сохранение акта..."
+                                      : "Сформировать акт"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="block w-full rounded px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50"
+                                    onClick={() => deleteProgram(program)}
+                                  >
+                                    Удалить таблицу
+                                  </button>
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead className="bg-zinc-100 text-zinc-700">
+                                <tr>
+                                  <th className="px-4 py-2 text-left">Мероприятия</th>
+                                  {programEditModeId === program.id ? (
+                                    <th className="px-4 py-2 text-left">Действия</th>
+                                  ) : null}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {program.activities.map((activity, index) => (
+                                  <tr key={`${program.id}-${index}`} className="border-t">
+                                    <td className="px-4 py-2">{activity}</td>
+                                    {programEditModeId === program.id ? (
+                                      <td className="px-4 py-2">
+                                        <div className="flex flex-wrap gap-2">
+                                          <button
+                                            type="button"
+                                            className="rounded-md border px-2 py-1 text-xs hover:bg-zinc-100"
+                                            onClick={() => editActivity(program.id, index)}
+                                          >
+                                            Изменить
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                                            onClick={() => deleteActivity(program.id, index)}
+                                          >
+                                            Удалить
+                                          </button>
+                                        </div>
+                                      </td>
+                                    ) : null}
+                                  </tr>
+                                ))}
+                                {program.activities.length === 0 ? (
+                                  <tr className="border-t">
+                                    <td
+                                      className="px-4 py-2 text-zinc-500"
+                                      colSpan={programEditModeId === program.id ? 2 : 1}
+                                    >
+                                      Мероприятия не добавлены
+                                    </td>
+                                  </tr>
+                                ) : null}
+                                <tr className="border-t">
+                                  <td className="px-4 py-2">
+                                    <button
+                                      type="button"
+                                      className="rounded-md border border-dashed px-3 py-1.5 text-sm hover:bg-zinc-50"
+                                      onClick={() => openAddActivityModal(program)}
+                                    >
+                                      + Добавить мероприятие
+                                    </button>
+                                  </td>
+                                  {programEditModeId === program.id ? <td className="px-4 py-2" /> : null}
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              ) : null}
+
+              {data.category === "Оборудование" ? (
+                <div className="rounded-xl border p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <h3 className="text-lg font-semibold">Документы</h3>
                     <label className="cursor-pointer rounded-md border px-3 py-2 text-sm hover:bg-zinc-100">
@@ -956,6 +1557,109 @@ export default function EquipmentDetailsPage() {
                 onClick={createArrival}
               >
                 {arrivalSaving ? "Сохранение..." : "Оприходовать"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {showProgramModal && data && data.category === "Оборудование" ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-xl rounded-xl bg-white p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Добавить программу ТО</h3>
+              <button
+                type="button"
+                className="rounded-md border px-2 py-1 text-sm"
+                onClick={closeProgramModal}
+              >
+                Закрыть
+              </button>
+            </div>
+            <form className="space-y-3" onSubmit={saveProgram}>
+              <input
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                placeholder="Название программы"
+                value={programTitle}
+                onChange={(event) => setProgramTitle(event.target.value)}
+                required
+              />
+              <input
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                value={data.name || ""}
+                readOnly
+              />
+              <button type="submit" className="w-full rounded-md bg-black px-4 py-2 text-sm text-white">
+                Добавить
+              </button>
+            </form>
+          </div>
+        </div>
+      ) : null}
+      {showActivityModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Добавить мероприятие</h3>
+              <button
+                type="button"
+                className="rounded-md border px-2 py-1 text-sm"
+                onClick={closeAddActivityModal}
+              >
+                Закрыть
+              </button>
+            </div>
+            <form className="space-y-3" onSubmit={submitAddActivity}>
+              <textarea
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                rows={4}
+                placeholder="Текст мероприятия"
+                value={activityValue}
+                onChange={(event) => setActivityValue(event.target.value)}
+                required
+              />
+              <button type="submit" className="w-full rounded-md bg-black px-4 py-2 text-sm text-white">
+                Добавить
+              </button>
+            </form>
+          </div>
+        </div>
+      ) : null}
+      {showActModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Сформировать акт</h3>
+              <button
+                type="button"
+                className="rounded-md border px-2 py-1 text-sm"
+                onClick={closeActModal}
+                disabled={Boolean(actSavingProgramId)}
+              >
+                Закрыть
+              </button>
+            </div>
+            <div className="space-y-3">
+              <p className="text-sm text-zinc-600">
+                Можно добавить изображения в акт (необязательно).
+              </p>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={onActImagesChange}
+                className="block w-full rounded-md border px-3 py-2 text-sm"
+                disabled={Boolean(actSavingProgramId)}
+              />
+              <p className="text-xs text-zinc-500">
+                Выбрано файлов: {actImages.length}
+              </p>
+              <button
+                type="button"
+                className="w-full rounded-md bg-black px-4 py-2 text-sm text-white disabled:opacity-60"
+                onClick={submitAct}
+                disabled={Boolean(actSavingProgramId)}
+              >
+                {actSavingProgramId ? "Сохранение акта..." : "Сформировать и сохранить"}
               </button>
             </div>
           </div>

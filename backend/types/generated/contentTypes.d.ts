@@ -527,6 +527,41 @@ export interface ApiInventoryInventory extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiMaintenanceProgramMaintenanceProgram
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'maintenance_programs';
+  info: {
+    displayName: 'Maintenance Program';
+    pluralName: 'maintenance-programs';
+    singularName: 'maintenance-program';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    activities: Schema.Attribute.JSON;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    equipment: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::equipment.equipment'
+    > &
+      Schema.Attribute.Required;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::maintenance-program.maintenance-program'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    title: Schema.Attribute.String & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiMovementMovement extends Struct.CollectionTypeSchema {
   collectionName: 'movements';
   info: {
@@ -1198,6 +1233,7 @@ declare module '@strapi/strapi' {
       'admin::user': AdminUser;
       'api::equipment.equipment': ApiEquipmentEquipment;
       'api::inventory.inventory': ApiInventoryInventory;
+      'api::maintenance-program.maintenance-program': ApiMaintenanceProgramMaintenanceProgram;
       'api::movement.movement': ApiMovementMovement;
       'api::notification.notification': ApiNotificationNotification;
       'api::unit.unit': ApiUnitUnit;
