@@ -1089,8 +1089,8 @@ export default function EquipmentDetailsPage() {
   return (
     <main className="min-h-screen bg-zinc-50">
       <AppNavbar />
-      <section className="mx-auto w-full max-w-5xl px-6 py-10">
-        <div className="rounded-2xl border bg-white p-6">
+      <section className="mx-auto w-full max-w-5xl px-3 py-10">
+        <div className="rounded-2xl border bg-white px-3 py-6">
           <div className="mb-4">
             <Link className="text-sm text-blue-700 hover:underline" href="/equipment">
               ← Назад к списку

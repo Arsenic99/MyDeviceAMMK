@@ -206,10 +206,10 @@ export default function MinimalPartsPage() {
         <table border="1" cellspacing="0" cellpadding="6">
           <tr><th colspan="4">Заявка на закуп (${dateLabel})</th></tr>
           <tr>
-            <th>№</th>
+            <th>Номер по порядку</th>
             <th>Наименование</th>
             <th>Артикул</th>
-            <th>Количество</th>
+            <th>Кол-во (не хватающее)</th>
           </tr>
           ${tableRows}
         </table>
@@ -396,11 +396,11 @@ export default function MinimalPartsPage() {
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,#f5f7ff_0%,#f8fafc_45%,#f5f5f4_100%)]">
       <AppNavbar />
-      <section className="mx-auto w-full max-w-6xl px-6 py-10">
-        <div className="rounded-3xl border border-zinc-200/80 bg-white/90 p-6 shadow-[0_10px_35px_-20px_rgba(0,0,0,0.35)] backdrop-blur">
+      <section className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+        <div className="rounded-2xl border border-zinc-200/80 bg-white/90 p-4 shadow-[0_10px_35px_-20px_rgba(0,0,0,0.35)] backdrop-blur sm:rounded-3xl sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-2xl font-semibold">Минимальный список запчастей</h2>
-            <div className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold sm:text-2xl">Минимальный список запчастей</h2>
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
               <button
                 type="button"
                 onClick={() => setShowOnlyShortage((value) => !value)}
@@ -422,7 +422,7 @@ export default function MinimalPartsPage() {
             </div>
           </div>
 
-          <form className="mt-4 grid gap-3 md:grid-cols-4" onSubmit={addRow}>
+          <form className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" onSubmit={addRow}>
             <input
               className="rounded-md border px-3 py-2 text-sm"
               placeholder="Наименование"
@@ -512,7 +512,7 @@ export default function MinimalPartsPage() {
                           ? createPortal(
                               <div
                                 data-minimal-parts-menu="true"
-                                className="fixed z-999 w-40 rounded-xl border border-zinc-200 bg-white/95 p-1.5 shadow-lg backdrop-blur"
+                                className="fixed z-[999] w-40 rounded-xl border border-zinc-200 bg-white/95 p-1.5 shadow-lg backdrop-blur"
                                 style={{ top: menuPosition.top, left: menuPosition.left }}
                               >
                                 <button
@@ -552,7 +552,7 @@ export default function MinimalPartsPage() {
       </section>
       {editingRow ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-4 sm:p-6">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold">Редактирование строки</h3>
               <button

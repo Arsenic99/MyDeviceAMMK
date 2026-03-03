@@ -172,18 +172,18 @@ export default function EquipmentPage() {
   }, [currentPage, totalPages]);
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#f5f7ff_0%,_#f8fafc_45%,_#f5f5f4_100%)]">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#f5f7ff_0%,#f8fafc_45%,#f5f5f4_100%)]">
       <AppNavbar />
-      <section className="mx-auto w-full max-w-5xl px-6 py-10">
-        <div className="overflow-hidden rounded-3xl border border-zinc-200/80 bg-white/90 shadow-[0_10px_35px_-20px_rgba(0,0,0,0.35)] backdrop-blur">
-          <div className="flex flex-wrap items-center justify-between gap-4 px-6 pt-6">
+      <section className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
+        <div className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white/90 shadow-[0_10px_35px_-20px_rgba(0,0,0,0.35)] backdrop-blur sm:rounded-3xl">
+          <div className="flex flex-wrap items-center justify-between gap-4 px-4 pt-4 sm:px-6 sm:pt-6">
             <div className="space-y-1">
-              <h2 className="text-2xl font-semibold tracking-tight text-zinc-900">Список оборудования</h2>
+              <h2 className="text-xl font-semibold tracking-tight text-zinc-900 sm:text-2xl">Список оборудования</h2>
               <p className="text-sm text-zinc-500">
                 Поиск и фильтрация по категории и материально ответственному лицу
               </p>
             </div>
-            <div className="w-full max-w-md">
+            <div className="w-full sm:max-w-md">
               <label htmlFor="equipment-search" className="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-500">
                 Поиск
               </label>
@@ -197,7 +197,7 @@ export default function EquipmentPage() {
               />
             </div>
           </div>
-          <div className="mx-6 mt-2">
+          <div className="mx-4 mt-2 sm:mx-6">
             <button
               type="button"
               onClick={() => setFiltersOpen((value) => !value)}
@@ -207,7 +207,7 @@ export default function EquipmentPage() {
             </button>
           </div>
           {filtersOpen ? (
-            <div className="mx-6 mt-2 rounded-2xl border border-zinc-200 bg-gradient-to-br from-zinc-50 to-white p-4">
+            <div className="mx-4 mt-2 rounded-2xl border border-zinc-200 bg-gradient-to-br from-zinc-50 to-white p-4 sm:mx-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <div className="text-sm text-zinc-600">
                 Найдено: <span className="font-semibold text-zinc-900">{filteredRows.length}</span>
@@ -288,11 +288,11 @@ export default function EquipmentPage() {
             </div>
             </div>
           ) : null}
-          {loading ? <p className="mx-6 mt-4 text-zinc-600">Загрузка...</p> : null}
-          {error ? <p className="mx-6 mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700">{error}</p> : null}
+          {loading ? <p className="mx-4 mt-4 text-zinc-600 sm:mx-6">Загрузка...</p> : null}
+          {error ? <p className="mx-4 mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700 sm:mx-6">{error}</p> : null}
           {!loading && !error ? (
             <>
-              <div className="mx-6 my-6 overflow-x-auto rounded-2xl border border-zinc-200">
+              <div className="mx-4 my-4 overflow-x-auto rounded-2xl border border-zinc-200 sm:mx-6 sm:my-6">
                 <table className="min-w-full border-collapse bg-white">
                   <thead>
                     <tr className="border-b bg-zinc-50 text-left text-xs uppercase tracking-wide text-zinc-500">
@@ -335,7 +335,7 @@ export default function EquipmentPage() {
                 </table>
               </div>
               {filteredRows.length > 0 ? (
-                <div className="mx-6 mb-6 flex flex-wrap items-center justify-between gap-3">
+                <div className="mx-4 mb-4 flex flex-wrap items-center justify-between gap-3 sm:mx-6 sm:mb-6">
                   <p className="text-sm text-zinc-600">
                     Показано {startIndex + 1}-{endIndex} из {filteredRows.length}
                   </p>

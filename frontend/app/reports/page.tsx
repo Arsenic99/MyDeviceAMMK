@@ -314,9 +314,9 @@ export default function ReportsPage() {
   return (
     <main className="min-h-screen bg-zinc-50">
       <AppNavbar />
-      <section className="mx-auto w-full max-w-6xl px-6 py-10">
-        <div className="rounded-2xl border bg-white p-6">
-          <h2 className="text-2xl font-semibold">Журнал/отчет операций</h2>
+      <section className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+        <div className="rounded-2xl border bg-white p-4 sm:p-6">
+          <h2 className="text-xl font-semibold sm:text-2xl">Журнал/отчет операций</h2>
           <div className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50/60 p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm text-zinc-600">
@@ -392,7 +392,7 @@ export default function ReportsPage() {
             >
               Месяц
             </button>
-            <label className="ml-2 text-sm text-zinc-700">
+            <label className="text-sm text-zinc-700 sm:ml-2">
               От
               <input
                 type="date"
@@ -475,7 +475,7 @@ export default function ReportsPage() {
                   <p className="text-sm text-zinc-600">
                     Показано {startIndex + 1}-{endIndex} из {filteredRows.length}
                   </p>
-                  <div className="flex items-center gap-2">
+                  <div className="flex w-full items-center gap-2 sm:w-auto">
                     <button
                       type="button"
                       onClick={() => setCurrentPage((value) => Math.max(1, value - 1))}
@@ -484,7 +484,7 @@ export default function ReportsPage() {
                     >
                       Назад
                     </button>
-                    <span className="text-sm text-zinc-700">
+                    <span className="flex-1 text-center text-sm text-zinc-700 sm:flex-none">
                       Страница {currentPage} из {totalPages}
                     </span>
                     <button

@@ -103,6 +103,7 @@ export default function AppNavbar() {
   const user = parseUser(userRaw);
   const username = user.username || user.email || "User";
   const [open, setOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [name, setName] = useState("");
   const [article, setArticle] = useState("");
@@ -266,43 +267,55 @@ export default function AppNavbar() {
 
   return (
     <nav className="border-b bg-white">
-      <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-4">
-          <Link className="text-sm text-zinc-700" href="/">
-            <h1 className="text-xl font-semibold">Automation <br /> department</h1>
+      <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
+        <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+          <Link className="text-sm text-zinc-700" href="/" onClick={() => setMobileMenuOpen(false)}>
+            <h1 className="text-base font-semibold leading-tight sm:text-xl">Automation <br /> department</h1>
           </Link>
 
-          <Link className="text-sm text-zinc-700" href="/equipment">
-            Список оборудования
-          </Link>
-          <Link className="text-sm text-zinc-700" href="/reports">
-            Журнал/отчет
-          </Link>
-          <Link className="text-sm text-zinc-700" href="/minimal-parts">
-            Минимальный список запчастей
-          </Link>
+          <div className="hidden w-full items-center gap-3 overflow-x-auto whitespace-nowrap text-sm sm:flex sm:w-auto">
+            <Link className="shrink-0 text-zinc-700" href="/equipment">
+              Список оборудования
+            </Link>
+            <Link className="shrink-0 text-zinc-700" href="/reports">
+              Журнал/отчет
+            </Link>
+            <Link className="shrink-0 text-zinc-700" href="/minimal-parts">
+              Минимальный список запчастей
+            </Link>
+          </div>
         </div>
-        <div className="relative">
+        <div className="flex items-center gap-2">
           <button
-            className="relative rounded-md border bg-white px-3 py-2 text-sm"
-            onClick={() => setOpen((value) => !value)}
             type="button"
+            className="rounded-md border bg-white px-2.5 py-2 text-sm sm:hidden"
+            onClick={() => setMobileMenuOpen((value) => !value)}
+            aria-label="Открыть меню"
+            aria-expanded={mobileMenuOpen}
           >
-            {username}
-            {hasOpenTasks ? (
-              <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-600 ring-2 ring-white" />
-            ) : null}
+            ☰
           </button>
-          {open ? (
-            <div className="absolute right-0 mt-2 w-56 rounded-md border bg-white p-2 shadow z-10">
-              <Link
-                className="mb-1 block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-zinc-100"
-                href="/cabinet"
-                onClick={() => setOpen(false)}
-              >
-                Личный кабинет
-              </Link>
-              {user.isResponsiblePerson ? (
+          <div className="relative">
+            <button
+              className="relative rounded-md border bg-white px-3 py-2 text-sm"
+              onClick={() => setOpen((value) => !value)}
+              type="button"
+            >
+              {username}
+              {hasOpenTasks ? (
+                <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-600 ring-2 ring-white" />
+              ) : null}
+            </button>
+            {open ? (
+              <div className="absolute right-0 z-10 mt-2 w-56 rounded-md border bg-white p-2 shadow">
+                <Link
+                  className="mb-1 block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-zinc-100"
+                  href="/cabinet"
+                  onClick={() => setOpen(false)}
+                >
+                  Личный кабинет
+                </Link>
+                {user.isResponsiblePerson ? (
                 <button
                   className="mb-1 w-full rounded-md px-3 py-2 text-left text-sm hover:bg-zinc-100"
                   onClick={() => {
@@ -313,21 +326,53 @@ export default function AppNavbar() {
                 >
                   Добавить оборудование
                 </button>
-              ) : null}
-              <button
-                className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-zinc-100"
-                onClick={logout}
-                type="button"
-              >
-                Выход
-              </button>
-            </div>
-          ) : null}
+                ) : null}
+                <button
+                  className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-zinc-100"
+                  onClick={() => {
+                    setOpen(false);
+                    setMobileMenuOpen(false);
+                    logout();
+                  }}
+                  type="button"
+                >
+                  Выход
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
+      {mobileMenuOpen ? (
+        <div className="border-t bg-white px-4 py-3 sm:hidden">
+          <div className="flex flex-col gap-2 text-sm">
+            <Link
+              className="rounded-md px-2 py-2 text-zinc-700 hover:bg-zinc-100"
+              href="/equipment"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Список оборудования
+            </Link>
+            <Link
+              className="rounded-md px-2 py-2 text-zinc-700 hover:bg-zinc-100"
+              href="/reports"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Журнал/отчет
+            </Link>
+            <Link
+              className="rounded-md px-2 py-2 text-zinc-700 hover:bg-zinc-100"
+              href="/minimal-parts"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Минимальный список запчастей
+            </Link>
+          </div>
+        </div>
+      ) : null}
       {showAddModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-4 sm:p-6">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold">Добавить оборудование</h2>
               <button
@@ -360,7 +405,7 @@ export default function AppNavbar() {
                 onChange={(event) => setDescription(event.target.value)}
                 rows={3}
               />
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <input
                   className="w-full rounded-md border px-3 py-2 text-sm"
                   placeholder="Кол-во"

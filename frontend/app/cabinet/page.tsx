@@ -359,17 +359,17 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-zinc-50">
       <AppNavbar />
-      <section className="mx-auto w-full max-w-5xl px-6 py-10">
-        <div className="rounded-2xl border bg-white p-8">
-          <h2 className="text-3xl font-semibold">Личный кабинет</h2>
+      <section className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
+        <div className="rounded-2xl border bg-white p-5 sm:p-8">
+          <h2 className="text-2xl font-semibold sm:text-3xl">Личный кабинет</h2>
           <p className="mt-2 text-zinc-600">Задачи на согласование и утверждение перемещений.</p>
         </div>
 
-        <div className="mt-6 rounded-2xl border bg-white p-6">
-          <div className="flex items-center justify-between gap-3">
+        <div className="mt-6 rounded-2xl border bg-white p-4 sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-xl font-semibold">Профиль</h3>
             {isEditingProfile ? (
-              <div className="flex gap-2">
+              <div className="flex w-full gap-2 sm:w-auto">
                 <button
                   type="button"
                   className="rounded-md border px-3 py-1 text-sm hover:bg-zinc-100"
@@ -456,7 +456,7 @@ export default function Home() {
           ) : null}
         </div>
 
-        <div className="mt-6 rounded-2xl border bg-white p-6">
+        <div className="mt-6 rounded-2xl border bg-white p-4 sm:p-6">
           <h3 className="text-xl font-semibold">Мои задачи</h3>
           {loading ? <p className="mt-3 text-zinc-600">Загрузка...</p> : null}
           {error ? <p className="mt-3 text-red-600">{error}</p> : null}
@@ -500,7 +500,7 @@ export default function Home() {
                             </button>
                           ) : null}
                           {row.status === "PENDING_MANAGER" ? (
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap gap-2">
                               <button
                                 type="button"
                                 className="rounded-md border px-2 py-1 hover:bg-zinc-100 disabled:opacity-60"
@@ -561,7 +561,7 @@ export default function Home() {
           ) : null}
         </div>
 
-        <div className="mt-6 rounded-2xl border bg-white p-6">
+        <div className="mt-6 rounded-2xl border bg-white p-4 sm:p-6">
           <h3 className="text-xl font-semibold">Уведомления</h3>
           <div className="mt-3 space-y-2">
             {notifications.map((item) => (
