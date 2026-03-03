@@ -1,0 +1,28 @@
+{
+  "kind": "collectionType",
+  "collectionName": "minimal_parts",
+  "info": {
+    "singularName": "minimal-part",
+    "pluralName": "minimal-parts",
+    "displayName": "Minimal Part"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "article": {
+      "type": "string",
+      "required": true
+    },
+    "quantity": {
+      "type": "decimal",
+      "required": true,
+      "default": 0
+    }
+  }
+}

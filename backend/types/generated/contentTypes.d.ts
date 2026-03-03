@@ -562,6 +562,38 @@ export interface ApiMaintenanceProgramMaintenanceProgram
   };
 }
 
+export interface ApiMinimalPartMinimalPart extends Struct.CollectionTypeSchema {
+  collectionName: 'minimal_parts';
+  info: {
+    displayName: 'Minimal Part';
+    pluralName: 'minimal-parts';
+    singularName: 'minimal-part';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    article: Schema.Attribute.String & Schema.Attribute.Required;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::minimal-part.minimal-part'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    publishedAt: Schema.Attribute.DateTime;
+    quantity: Schema.Attribute.Decimal &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<0>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiMovementMovement extends Struct.CollectionTypeSchema {
   collectionName: 'movements';
   info: {
@@ -1234,6 +1266,7 @@ declare module '@strapi/strapi' {
       'api::equipment.equipment': ApiEquipmentEquipment;
       'api::inventory.inventory': ApiInventoryInventory;
       'api::maintenance-program.maintenance-program': ApiMaintenanceProgramMaintenanceProgram;
+      'api::minimal-part.minimal-part': ApiMinimalPartMinimalPart;
       'api::movement.movement': ApiMovementMovement;
       'api::notification.notification': ApiNotificationNotification;
       'api::unit.unit': ApiUnitUnit;

@@ -1114,7 +1114,7 @@ export default function EquipmentDetailsPage() {
                   <div className="relative">
                     <button
                       type="button"
-                      className="rounded-md border px-3 py-1 text-xl leading-none hover:bg-zinc-100"
+                      className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-base leading-none text-zinc-500 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-700 cursor-pointer"
                       onClick={() => setShowActionsMenu((value) => !value)}
                       aria-label="Открыть действия"
                     >

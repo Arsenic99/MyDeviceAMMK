@@ -278,6 +278,9 @@ export default function AppNavbar() {
           <Link className="text-sm text-zinc-700" href="/reports">
             Журнал/отчет
           </Link>
+          <Link className="text-sm text-zinc-700" href="/minimal-parts">
+            Минимальный список запчастей
+          </Link>
         </div>
         <div className="relative">
           <button
